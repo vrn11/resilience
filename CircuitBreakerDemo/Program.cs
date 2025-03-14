@@ -9,66 +9,65 @@ public class Program
     {
         // ----------------------------------------------------------------------------------
         // Simulation setup:
-        // For demonstration, we're simulating load using a random number generator.
-        // In production, the loadMonitor should reflect real system metrics.
+        // For demonstration, we simulate system load using a random number generator.
+        // A real load monitor should return actual metrics (e.g., CPU usage or queue length).
         // ----------------------------------------------------------------------------------
         Random random = new Random();
-        Func<double> sampleLoad = () => random.NextDouble(); // Simulated load between 0.0 and 1.0
+        Func<double> sampleLoad = () => random.NextDouble();  // Simulated load range: 0.0 to 1.0
 
-        // Create the load shedder with a threshold of 0.7 (i.e., if load > 70%, shed low or medium priority requests).
-        var loadShedder = new LoadShedder(sampleLoad, loadThreshold: 0.7);
+        // Configure the load shedder.
+        var loadShedderOptions = new LoadShedderOptions { LoadThreshold = 0.7 };
+        var loadShedder = new LoadShedder(sampleLoad, loadShedderOptions);
 
-        // Create a circuit breaker with a threshold of 3 consecutive failures and an open timeout of 5 seconds.
-        var circuitBreaker = new CircuitBreaker( failureThreshold: 3, openTimeout: TimeSpan.FromSeconds(5));
+        // Configure the circuit breaker.
+        var circuitBreakerOptions = new CircuitBreakerOptions { FailureThreshold = 3, OpenTimeout = TimeSpan.FromSeconds(5) };
+        var circuitBreaker = new CircuitBreaker(circuitBreakerOptions);
 
         // ----------------------------------------------------------------------------------
         // Define a "risky" action that might fail.
-        // In a real system, this might be a call to a remote service or a resource-intensive operation.
+        // In a real system, this might call a remote service or perform a resource-intensive operation.
         // ----------------------------------------------------------------------------------
         Func<Task<string>> riskyAction = async () =>
         {
-            // Simulate some delay.
+            // Simulate delay.
             await Task.Delay(100);
-
             // Simulate a 50% chance of failure.
             if (random.Next(0, 2) == 0)
-                throw new Exception("Simulated failure in riskyAction");
-            
-            return "Action succeeded";
+                throw new Exception("Simulated risky action failure");
+            return "Risky action succeeded";
         };
 
-        // Optionally, define a fallback action for the circuit breaker.
-        Func<Task<string>> fallbackAction = async () =>
+        // Define fallback action for the circuit breaker.
+        Func<Task<string>> circuitBreakerFallback = async () =>
         {
             await Task.Delay(50);
-            return "Circuit breaker fallback result";
+            return "Fallback: Circuit breaker response";
         };
 
-        // Optional fallback for load shedding when traffic is shed.
-        Func<Task<string>> loadShedFallback = () => Task.FromResult("Load shed fallback result");
+        // Define fallback action for load shedding.
+        Func<Task<string>> loadShedderFallback = () => Task.FromResult("Fallback: Load shedder response");
 
         // ----------------------------------------------------------------------------------
-        // Combined execution: first apply load shedding, then use the circuit breaker to protect
-        // the risky action.
+        // Combined execution: Apply load shedding first, then protect the risky action with the circuit breaker.
         // ----------------------------------------------------------------------------------
-        Console.WriteLine("Starting simulation of requests...\n");
+        Console.WriteLine("Starting MyResilienceSDK Demo...\n");
+
         for (int i = 0; i < 10; i++)
         {
             try
             {
                 string result = await loadShedder.ExecuteAsync(
-                    priority: RequestPriority.Medium,
-                    action: async () => await circuitBreaker.ExecuteAsync(riskyAction, fallbackAction),
-                    fallback: loadShedFallback);
-
+                    RequestPriority.Medium,
+                    async () => await circuitBreaker.ExecuteAsync(riskyAction, circuitBreakerFallback),
+                    loadShedderFallback);
                 Console.WriteLine($"Request {i + 1}: {result}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Request {i + 1}: Exception - {ex.Message}");
+                Console.WriteLine($"Request {i + 1}: Error - {ex.Message}");
             }
         }
 
-        Console.WriteLine("\nSimulation complete.");
+        Console.WriteLine("\nDemo complete.");
     }
 }
