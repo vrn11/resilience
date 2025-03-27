@@ -17,7 +17,24 @@ The **Resilience SDK** is a .NET-based library designed to provide robust and co
 - **Extensibility**: Add custom circuit breakers or load shedders by implementing the provided interfaces.
 
 ## Project Structure
-resilience.sln CircuitBreakerDemo/ Program.cs resilienceConfig.json Resilence/ CircuitBreaker/ BasicCircuitBreaker.cs CircuitBreaker.cs CircuitBreakerFactory.cs ErrorRateCircuitBreaker.cs Configuration/ ComponentConfiguration.cs ResilienceConfigParser.cs ResilienceConfiguration.cs LoadShedder/ StaticLoadShedder.cs ResponsiveLoadShedder.cs LoadShedderFactory.cs
+resilience.sln 
+CircuitBreakerDemo/
+  Program.cs 
+  resilienceConfig.json 
+Resilence/ 
+  CircuitBreaker/ 
+    BasicCircuitBreaker.cs 
+    CircuitBreaker.cs 
+    CircuitBreakerFactory.cs 
+    ErrorRateCircuitBreaker.cs 
+  Configuration/ 
+    ComponentConfiguration.cs 
+    ResilienceConfigParser.cs 
+    ResilienceConfiguration.cs 
+  LoadShedder/ 
+    StaticLoadShedder.cs 
+    ResponsiveLoadShedder.cs 
+    LoadShedderFactory.cs
 
 
 ## Getting Started
