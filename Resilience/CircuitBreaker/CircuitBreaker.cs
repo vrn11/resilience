@@ -1,104 +1,160 @@
-﻿namespace Resilience.CircuitBreaker;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Distributed;
 
-/// <summary>
-/// A generic circuit breaker that monitors an asynchronous action, 
-/// tracks failures, and opens the circuit when failures exceed a threshold.
-/// </summary>
-public class CircuitBreaker : ICircuitBreaker
+namespace Resilience.CircuitBreaker
 {
-    private readonly int _failureThreshold;
-    private readonly TimeSpan _openTimeout;
-    private int _failureCount = 0;
-    private CircuitBreakerState _state = CircuitBreakerState.Closed;
-    private DateTime _lastStateChangedUtc = DateTime.UtcNow;
-    private readonly object _stateLock = new object();
-
-    public CircuitBreaker(CircuitBreakerOptions options)
-    {
-        _failureThreshold = options.FailureThreshold;
-        _openTimeout = options.OpenTimeout;
-    }
-
     /// <summary>
-    /// Executes an asynchronous action under the protection of the circuit breaker.
+    /// A generic circuit breaker that monitors an asynchronous action, 
+    /// tracks failures, and opens the circuit when failures exceed a threshold.
+    /// Optimized for scalability and performance.
     /// </summary>
-    /// <typeparam name="T">Return type of the action.</typeparam>
-    /// <param name="action">The protected action.</param>
-    /// <param name="fallback">Optional fallback action used when the circuit is open or the action fails.</param>
-    /// <returns>The result of the action or fallback.</returns>
-    public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<Task<T>> fallback = default!)
+    public class CircuitBreaker : ICircuitBreaker
     {
-        Func<Task<T>> localFallback = default!;
+        private readonly int _failureThreshold;
+        private readonly TimeSpan _openTimeout;
 
-        // Use a lock for checking/updating state.
-        lock (_stateLock)
+        // Using atomic variables to reduce contention
+        private int _failureCount = 0;
+        private int _state = (int)CircuitBreakerState.Closed;
+        private DateTime _lastStateChangedUtc = DateTime.UtcNow;
+
+        // Optional distributed store for state sharing (e.g., Redis)
+        private readonly IDistributedCache? _distributedCache;
+
+        // Event for monitoring state changes
+        public event Action<CircuitBreakerState>? OnStateChange;
+
+        public CircuitBreaker(CircuitBreakerOptions options, IDistributedCache? distributedCache = null)
         {
-            if (_state == CircuitBreakerState.Open)
+            _failureThreshold = options.FailureThreshold;
+            _openTimeout = options.OpenTimeout;
+            _distributedCache = distributedCache;
+        }
+
+        /// <summary>
+        /// Executes an asynchronous action under the protection of the circuit breaker.
+        /// </summary>
+        /// <typeparam name="T">Return type of the action.</typeparam>
+        /// <param name="action">The protected action.</param>
+        /// <param name="fallback">Optional fallback action used when the circuit is open or the action fails.</param>
+        /// <returns>The result of the action or fallback.</returns>
+        public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<Task<T>> fallback = default!)
+        {
+            // Check circuit breaker state
+            if (await GetCurrentStateAsync() == CircuitBreakerState.Open)
             {
-                // If the timeout has elapsed, allow a trial execution.
                 if (DateTime.UtcNow - _lastStateChangedUtc > _openTimeout)
                 {
-                    _state = CircuitBreakerState.HalfOpen;
+                    await SetStateAsync(CircuitBreakerState.HalfOpen); // Transition to Half-Open
                 }
                 else
                 {
-                    // If fallback is provided, capture it for asynchronous call outside the lock.
-                    if (fallback != null)
-                    {
-                        localFallback = fallback;
-                    }
-                    else
-                    {
-                        throw new CircuitBreakerOpenException("Circuit breaker is open.");
-                    }
+                    return await HandleFallbackAsync(fallback);
                 }
+            }
+
+            try
+            {
+                // Execute the protected action
+                T result = await action();
+
+                // Reset the circuit breaker state on successful execution
+                await ResetAsync();
+                return result;
+            }
+            catch (Exception)
+            {
+                // Increment failure count and possibly open the circuit
+                await IncrementFailureAsync();
+                return await HandleFallbackAsync(fallback);
             }
         }
 
-        if (localFallback != null)
-            return await localFallback();
-
-        try
+        /// <summary>
+        /// Resets the circuit breaker to the Closed state.
+        /// </summary>
+        private async Task ResetAsync()
         {
-            T result = await action();
+            await SetStateAsync(CircuitBreakerState.Closed);
+            Interlocked.Exchange(ref _failureCount, 0);
 
-            lock (_stateLock)
+            // Clear distributed cache for failures
+            if (_distributedCache != null)
             {
-                if (_state == CircuitBreakerState.HalfOpen)
-                {
-                    Reset();
-                }
-                else if (_state == CircuitBreakerState.Closed)
-                {
-                    _failureCount = 0;
-                }
+                await _distributedCache.RemoveAsync("circuit-breaker-failures");
             }
-            return result;
         }
-        catch (Exception)
+
+        /// <summary>
+        /// Increments the failure count and opens the circuit if the failure threshold is exceeded.
+        /// </summary>
+        private async Task IncrementFailureAsync()
         {
-            lock (_stateLock)
+            int currentFailureCount = Interlocked.Increment(ref _failureCount);
+
+            if (_distributedCache != null)
             {
-                _failureCount++;
-                if (_failureCount >= _failureThreshold)
-                {
-                    _state = CircuitBreakerState.Open;
-                    _lastStateChangedUtc = DateTime.UtcNow;
-                }
+                // Sync failure count in Redis
+                string failureCountStr = await _distributedCache.GetStringAsync("circuit-breaker-failures") ?? "0";
+                int distributedFailureCount = int.Parse(failureCountStr) + 1;
+                await _distributedCache.SetStringAsync("circuit-breaker-failures", distributedFailureCount.ToString());
             }
+
+            if (currentFailureCount >= _failureThreshold)
+            {
+                await SetStateAsync(CircuitBreakerState.Open);
+            }
+        }
+
+        /// <summary>
+        /// Handles fallback logic when the circuit breaker is open or the protected action fails.
+        /// </summary>
+        private async Task<T> HandleFallbackAsync<T>(Func<Task<T>> fallback)
+        {
             if (fallback != null)
+            {
                 return await fallback();
+            }
 
-            throw;
+            throw new CircuitBreakerOpenException("Circuit breaker is open.");
         }
-    }
 
-    private void Reset()
-    {
-        _state = CircuitBreakerState.Closed;
-        _failureCount = 0;
-        _lastStateChangedUtc = DateTime.UtcNow;
+        /// <summary>
+        /// Gets the current circuit breaker state, optionally synced with distributed storage.
+        /// </summary>
+        private async Task<CircuitBreakerState> GetCurrentStateAsync()
+        {
+            if (_distributedCache != null)
+            {
+                string? stateValue = await _distributedCache.GetStringAsync("circuit-breaker-state");
+                if (!string.IsNullOrEmpty(stateValue) &&
+                    Enum.TryParse<CircuitBreakerState>(stateValue, out var state))
+                {
+                    return state;
+                }
+            }
+            return (CircuitBreakerState)_state;
+        }
+
+        /// <summary>
+        /// Sets the circuit breaker state and notifies state change subscribers.
+        /// </summary>
+        private async Task SetStateAsync(CircuitBreakerState newState)
+        {
+            Interlocked.Exchange(ref _state, (int)newState);
+            _lastStateChangedUtc = DateTime.UtcNow;
+
+            // Notify monitoring systems
+            OnStateChange?.Invoke(newState);
+
+            // Persist state to distributed storage
+            if (_distributedCache != null)
+            {
+                await _distributedCache.SetStringAsync("circuit-breaker-state", newState.ToString());
+                await _distributedCache.SetStringAsync("circuit-breaker-last-changed", _lastStateChangedUtc.ToString("O"));
+            }
+        }
     }
 }
-
-
