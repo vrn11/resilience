@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.LoadShedder;
 
     /// <summary>
     /// A generic load shedder that uses a load monitor function to decide if a request should be processed.

@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.CircuitBreaker;
 
 /// <summary>
 /// Represents the current state of the circuit breaker.

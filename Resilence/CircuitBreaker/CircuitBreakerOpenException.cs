@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.CircuitBreaker;
 
 /// <summary>
 /// Exception thrown when the circuit breaker is open.

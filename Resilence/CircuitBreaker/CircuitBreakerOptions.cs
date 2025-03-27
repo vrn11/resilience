@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.CircuitBreaker;
 
 /// <summary>
 /// Options used to configure the circuit breaker.

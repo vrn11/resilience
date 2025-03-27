@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.LoadShedder;
 
 /// <summary>
 /// Represents the priority levels of requests.

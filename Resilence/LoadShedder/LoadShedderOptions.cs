@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.LoadShedder;
 
 /// <summary>
 /// Options used to configure the load shedder.

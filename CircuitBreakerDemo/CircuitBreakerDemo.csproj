@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\CircuitBreaker\CircuitBreaker.csproj" />
+    <ProjectReference Include="..\Resilence\Resilence.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

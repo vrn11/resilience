@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.CircuitBreaker;
 
 /// <summary>
 /// A generic circuit breaker interface.

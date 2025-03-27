@@ -1,5 +1,8 @@
 ﻿namespace CircuitBreakerDemo;
-using CircuitBreaker;
+using Resilience;
+using Resilience.Configuration;
+using Resilience.LoadShedder;
+using Resilience.CircuitBreaker;
 using System;
 using System.Threading.Tasks;
 
@@ -7,50 +10,43 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        // ----------------------------------------------------------------------------------
-        // Simulation setup:
-        // For demonstration, we simulate system load using a random number generator.
-        // A real load monitor should return actual metrics (e.g., CPU usage or queue length).
-        // ----------------------------------------------------------------------------------
+        // Example configuration JSON file path. In production, adjust the path as necessary.
+        string configPath = "resilienceConfig.json";
+
+        // Parse the configuration from JSON.
+        ResilienceConfiguration config = await ResilienceConfigParser.ParseConfigurationAsync(configPath);
+
+        // For demonstration, we use the Gateway configuration.
+        var gatewayCBConfig = config.Gateways.CircuitBreaker;
+        var gatewayLSConfig = config.Gateways.LoadShedder;
+
+        // Create resilience components using factories.
+        ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(gatewayCBConfig.Type, gatewayCBConfig.Options);
+
+        // For load monitoring, we simulate using a random value between 0.0 and 1.0.
         Random random = new Random();
-        Func<double> sampleLoad = () => random.NextDouble();  // Simulated load range: 0.0 to 1.0
+        Func<double> loadMonitor = () => random.NextDouble();
+        ILoadShedder loadShedder = LoadShedderFactory.Create(gatewayLSConfig.Type, loadMonitor, gatewayLSConfig.Options);
 
-        // Configure the load shedder.
-        var loadShedderOptions = new LoadShedderOptions { LoadThreshold = 0.7 };
-        var loadShedder = new LoadShedder(sampleLoad, loadShedderOptions);
-
-        // Configure the circuit breaker.
-        var circuitBreakerOptions = new CircuitBreakerOptions { FailureThreshold = 3, OpenTimeout = TimeSpan.FromSeconds(5) };
-        var circuitBreaker = new CircuitBreaker(circuitBreakerOptions);
-
-        // ----------------------------------------------------------------------------------
-        // Define a "risky" action that might fail.
-        // In a real system, this might call a remote service or perform a resource-intensive operation.
-        // ----------------------------------------------------------------------------------
+        // Define a risky action that may fail.
         Func<Task<string>> riskyAction = async () =>
         {
-            // Simulate delay.
             await Task.Delay(100);
-            // Simulate a 50% chance of failure.
             if (random.Next(0, 2) == 0)
-                throw new Exception("Simulated risky action failure");
-            return "Risky action succeeded";
+                throw new Exception("Simulated risky action failure.");
+            return "Risky action succeeded.";
         };
 
-        // Define fallback action for the circuit breaker.
-        Func<Task<string>> circuitBreakerFallback = async () =>
+        // Define fallback actions.
+        Func<Task<string>> cbFallback = async () =>
         {
             await Task.Delay(50);
-            return "Fallback: Circuit breaker response";
+            return "Circuit breaker fallback result.";
         };
 
-        // Define fallback action for load shedding.
-        Func<Task<string>> loadShedderFallback = () => Task.FromResult("Fallback: Load shedder response");
+        Func<Task<string>> lsFallback = () => Task.FromResult("Load shedder fallback result.");
 
-        // ----------------------------------------------------------------------------------
-        // Combined execution: Apply load shedding first, then protect the risky action with the circuit breaker.
-        // ----------------------------------------------------------------------------------
-        Console.WriteLine("Starting MyResilienceSDK Demo...\n");
+        Console.WriteLine("Starting MyResilienceSDK Demo with configuration-driven strategies...\n");
 
         for (int i = 0; i < 10; i++)
         {
@@ -58,8 +54,8 @@ public class Program
             {
                 string result = await loadShedder.ExecuteAsync(
                     RequestPriority.Medium,
-                    async () => await circuitBreaker.ExecuteAsync(riskyAction, circuitBreakerFallback),
-                    loadShedderFallback);
+                    async () => await circuitBreaker.ExecuteAsync(riskyAction, cbFallback),
+                    lsFallback);
                 Console.WriteLine($"Request {i + 1}: {result}");
             }
             catch (Exception ex)

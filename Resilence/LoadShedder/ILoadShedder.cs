@@ -1,4 +1,4 @@
-﻿namespace CircuitBreaker;
+﻿namespace Resilience.LoadShedder;
 
 /// <summary>
 /// A generic load shedder interface.
