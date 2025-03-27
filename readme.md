@@ -1,20 +1,35 @@
 # Resilience SDK
 
-The **Resilience SDK** is a .NET-based library designed to provide robust and configurable resilience strategies for applications. It includes implementations for **Circuit Breakers** and **Load Shedders**, enabling applications to handle failures gracefully and maintain stability under high load conditions.
+## Overview
+The **Resilience SDK** is a .NET-based library designed to provide robust and configurable resilience strategies for applications handling billions of requests per second. It includes implementations for **Circuit Breakers** and **Load Shedders**, enabling applications to gracefully handle failures and maintain stability under high-load conditions.
+
+---
 
 ## Features
 
-- **Circuit Breaker**: Protects systems from cascading failures by monitoring failures and opening the circuit when thresholds are exceeded.
-  - Basic Circuit Breaker
-  - Error Rate Circuit Breaker
+### Circuit Breaker
+- Protects systems from cascading failures by monitoring failures and opening circuits when thresholds are exceeded:
+  - **Basic Circuit Breaker**: Monitors failure counts and enforces timeouts.
+  - **Error Rate Circuit Breaker**: Tracks error rates over a sliding window to trigger state transitions.
 
-- **Load Shedder**: Prevents overload by rejecting low-priority requests when the system load exceeds a defined threshold.
-  - Static Load Shedder
-  - Responsive Load Shedder
+### Load Shedder
+- Prevents overload by rejecting low-priority requests when the system load exceeds a defined threshold:
+  - **Static Load Shedder**: Uses a fixed threshold to shed low-priority traffic.
+  - **Responsive Load Shedder**: Dynamically adjusts thresholds based on historical metrics and current conditions.
 
-- **Configuration-Driven**: Easily configure resilience strategies using JSON files.
+### Configuration-Driven Strategies
+- Resilience strategies can be fully customized through JSON-based configuration, allowing runtime adjustments without redeployments.
 
-- **Extensibility**: Add custom circuit breakers or load shedders by implementing the provided interfaces.
+### Scalability and Distributed Support
+- **Distributed State Management**: Integrates with Redis or other distributed caches to synchronize thresholds, failure metrics, and load states.
+- **Thread-Safe Updates**: Supports safe updates to thresholds and metrics in both synchronous and asynchronous contexts.
+
+### Extensibility
+- Add custom circuit breakers or load shedders by implementing the provided interfaces:
+  - **ICircuitBreaker**
+  - **ILoadShedder**
+
+---
 
 ## Project Structure
 ```bash
@@ -84,15 +99,33 @@ The demo application demonstrates how to use the SDK:
 string configPath = "resilienceConfig.json";
 ResilienceConfiguration config = await ResilienceConfigParser.ParseConfigurationAsync(configPath);
 
-ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(config.Gateways.CircuitBreaker.Type, config.Gateways.CircuitBreaker.Options);
+// Circuit Breaker Initialization
+ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(
+    config.Gateways.CircuitBreaker.Type,
+    config.Gateways.CircuitBreaker.Options
+);
 
-ILoadShedder loadShedder = LoadShedderFactory.Create(config.Gateways.LoadShedder.Type, () => new Random().NextDouble(), config.Gateways.LoadShedder.Options);
+// Load Shedder Initialization
+ILoadShedder loadShedder = LoadShedderFactory.Create(
+    config.Gateways.LoadShedder.Type,
+    () => new Random().NextDouble(), // Load monitor function
+    config.Gateways.LoadShedder.Options
+);
+```
 
+### Executing Protected Actions
+```bash
+// Execute an action using Load Shedder and Circuit Breaker
 string result = await loadShedder.ExecuteAsync(
     RequestPriority.Medium,
-    async () => await circuitBreaker.ExecuteAsync(() => Task.FromResult("Success")),
-    () => Task.FromResult("Fallback")
+    async () => await circuitBreaker.ExecuteAsync(
+        async () => "Success",
+        async () => "Circuit Breaker Fallback"
+    ),
+    async () => "Load Shedder Fallback"
 );
+
+Console.WriteLine(result);
 ```
 
 ## Extending the SDK
