@@ -17,6 +17,7 @@ The **Resilience SDK** is a .NET-based library designed to provide robust and co
 - **Extensibility**: Add custom circuit breakers or load shedders by implementing the provided interfaces.
 
 ## Project Structure
+```bash
 resilience.sln 
 CircuitBreakerDemo/
   Program.cs 
@@ -57,7 +58,7 @@ dotnet run --project CircuitBreakerDemo/CircuitBreakerDemo.csproj
 
 ### Configuration
 The resilience strategies are configured using a JSON file (resilienceConfig.json). Below is an example configuration:
-
+```bash
 {
   "Gateways": {
     "CircuitBreaker": {
@@ -78,7 +79,7 @@ The resilience strategies are configured using a JSON file (resilienceConfig.jso
 
 ### Example Usage
 The demo application demonstrates how to use the SDK:
-
+```bash
 string configPath = "resilienceConfig.json";
 ResilienceConfiguration config = await ResilienceConfigParser.ParseConfigurationAsync(configPath);
 
@@ -112,5 +113,5 @@ Contributions are welcome! Please follow these steps:
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ### Acknowledgments
-1. Inspired by resilience patterns such as Circuit Breaker and Load Shedding.
-2. Built with .NET 9.0.
+- Inspired by resilience patterns such as Circuit Breaker and Load Shedding.
+- Built with .NET 9.0.
