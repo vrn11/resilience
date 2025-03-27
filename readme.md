@@ -22,7 +22,7 @@ resilience.sln
 CircuitBreakerDemo/
   Program.cs 
   resilienceConfig.json 
-Resilence/ 
+Resilience/ 
   CircuitBreaker/ 
     BasicCircuitBreaker.cs 
     CircuitBreaker.cs 
