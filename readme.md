@@ -36,7 +36,7 @@ Resilence/
     StaticLoadShedder.cs 
     ResponsiveLoadShedder.cs 
     LoadShedderFactory.cs
-
+```
 
 ## Getting Started
 
@@ -76,6 +76,7 @@ The resilience strategies are configured using a JSON file (resilienceConfig.jso
     }
   }
 }
+```
 
 ### Example Usage
 The demo application demonstrates how to use the SDK:
@@ -92,26 +93,20 @@ string result = await loadShedder.ExecuteAsync(
     async () => await circuitBreaker.ExecuteAsync(() => Task.FromResult("Success")),
     () => Task.FromResult("Fallback")
 );
+```
 
-### Extending the SDK
-#### Adding a Custom Circuit Breaker
+## Extending the SDK
+### Adding a Custom Circuit Breaker
 1. Implement the ICircuitBreaker interface.
 2. Add your implementation to the CircuitBreakerFactory.
 
-#### Adding a Custom Load Shedder
+### Adding a Custom Load Shedder
 1. Implement the ILoadShedder interface.
 2. Add your implementation to the LoadShedderFactory.
 
-#### Contributing
+### Contributing
 Contributions are welcome! Please follow these steps:
 
 1. Fork the repository.
 2. Create a feature branch.
 3. Submit a pull request.
-
-#### License
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-### Acknowledgments
-- Inspired by resilience patterns such as Circuit Breaker and Load Shedding.
-- Built with .NET 9.0.
