@@ -65,7 +65,7 @@ Resilience/
 1. Clone the repository:
    ```bash
    git clone https://github.com/vrn11/resilience.git
-   cd circuit_breaker
+   cd resilience
 2. Build the solution:
 dotnet build resilience.sln
 3. Run the demo application:
