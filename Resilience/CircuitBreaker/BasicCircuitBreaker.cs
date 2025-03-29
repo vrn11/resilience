@@ -132,7 +132,25 @@ namespace Resilience.CircuitBreaker
             _state = newState;
             _lastStateChangedUtc = DateTime.UtcNow;
 
-            OnStateChange?.Invoke(_state); // Notify listeners of state change
+            // Notify listeners asynchronously
+            if (OnStateChange != null)
+            {
+                foreach (var handler in OnStateChange.GetInvocationList())
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            handler.DynamicInvoke(_state);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the exception (optional)
+                            Console.WriteLine($"Error in OnStateChange handler: {ex.Message}");
+                        }
+                    });
+                }
+            }
 
             if (_distributedCache != null)
             {

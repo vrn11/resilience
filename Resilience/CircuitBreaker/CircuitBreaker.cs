@@ -146,8 +146,25 @@ namespace Resilience.CircuitBreaker
             Interlocked.Exchange(ref _state, (int)newState);
             _lastStateChangedUtc = DateTime.UtcNow;
 
-            // Notify monitoring systems
-            OnStateChange?.Invoke(newState);
+            // Notify monitoring systems asynchronously
+            if (OnStateChange != null)
+            {
+                foreach (var handler in OnStateChange.GetInvocationList())
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            handler.DynamicInvoke(newState);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log the exception (optional)
+                            Console.WriteLine($"Error in OnStateChange handler: {ex.Message}");
+                        }
+                    });
+                }
+            }
 
             // Persist state to distributed storage
             if (_distributedCache != null)
