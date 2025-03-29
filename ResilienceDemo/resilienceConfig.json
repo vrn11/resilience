@@ -1,0 +1,33 @@
+{
+    "Gateways": {
+      "CircuitBreaker": {
+        "Type": "latency",
+        "Options": {
+          "FailureThreshold": 5,
+          "OpenTimeout": "00:00:01"
+        }
+      },
+      "LoadShedder": {
+        "Type": "static",
+        "Options": {
+          "LoadThreshold": 0.8
+        }
+      }
+    },
+    "Microservices": {
+      "CircuitBreaker": {
+        "Type": "errorrate",
+        "Options": {
+          "FailureThreshold": 3,
+          "OpenTimeout": "00:00:05"
+        }
+      },
+      "LoadShedder": {
+        "Type": "responsive",
+        "Options": {
+          "LoadThreshold": 0.6
+        }
+      }
+    }
+  }
+  

@@ -1,15 +1,23 @@
-﻿namespace CircuitBreakerDemo;
+﻿namespace ResilienceDemo;
+
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Resilience;
 using Resilience.Configuration;
 using Resilience.LoadShedder;
 using Resilience.CircuitBreaker;
-using System;
-using System.Threading.Tasks;
 
 public class Program
 {
     public static async Task Main(string[] args)
     {
+        RedisCache redisCache = new RedisCache(new RedisCacheOptions
+        {
+            Configuration = "localhost:6379",
+            InstanceName = "ResilienceDemo"
+        });
+
         // Example configuration JSON file path. In production, adjust the path as necessary.
         string configPath = "resilienceConfig.json";
 
@@ -21,12 +29,12 @@ public class Program
         var gatewayLSConfig = config.Gateways.LoadShedder;
 
         // Create resilience components using factories.
-        ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(gatewayCBConfig.Type, gatewayCBConfig.Options);
+        ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(gatewayCBConfig.Type, gatewayCBConfig.Options, redisCache);
 
         // For load monitoring, we simulate using a random value between 0.0 and 1.0.
         Random random = new Random();
         Func<double> loadMonitor = () => random.NextDouble();
-        ILoadShedder loadShedder = LoadShedderFactory.Create(gatewayLSConfig.Type, loadMonitor, gatewayLSConfig.Options);
+        ILoadShedder loadShedder = LoadShedderFactory.Create(gatewayLSConfig.Type, loadMonitor, gatewayLSConfig.Options, redisCache);
 
         // Define a risky action that may fail.
         Func<Task<string>> riskyAction = async () =>
@@ -48,7 +56,8 @@ public class Program
 
         Console.WriteLine("Starting MyResilienceSDK Demo with configuration-driven strategies...\n");
 
-        for (int i = 0; i < 10; i++)
+        int errorCount = 0;
+        for (int i = 0; i < 50; i++)
         {
             try
             {
@@ -60,9 +69,12 @@ public class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Request {i + 1}: Error - {ex.Message}");
+                Console.WriteLine($"Request {i + 1}: *Error* - {ex.Message}");
+                errorCount++;
             }
         }
+
+        Console.WriteLine($"\nTotal errors encountered: {errorCount}");
 
         Console.WriteLine("\nDemo complete.");
     }
