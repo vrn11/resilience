@@ -1,10 +1,11 @@
 ﻿namespace Resilience.CircuitBreaker;
 
 using Microsoft.Extensions.Caching.Distributed;
+using Resilience.Caching;
 
 public static class CircuitBreakerFactory
 {
-    public static ICircuitBreaker Create(string type, CircuitBreakerOptions options, IDistributedCache? distributedCache = null)
+    public static ICircuitBreaker Create(string type, CircuitBreakerOptions options, IResilienceDistributedCache? distributedCache = null)
     {
         switch (type.ToLowerInvariant())
         {

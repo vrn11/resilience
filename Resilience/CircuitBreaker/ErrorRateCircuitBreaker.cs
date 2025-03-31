@@ -1,11 +1,12 @@
 ﻿namespace Resilience.CircuitBreaker;
 using Microsoft.Extensions.Caching.Distributed;
+using Resilience.Caching;
 
 public class ErrorRateCircuitBreaker : ICircuitBreaker
 {
     private readonly BasicCircuitBreaker _innerBreaker;
 
-    public ErrorRateCircuitBreaker(CircuitBreakerOptions options, IDistributedCache? distributedCache = null)
+    public ErrorRateCircuitBreaker(CircuitBreakerOptions options, IResilienceDistributedCache? distributedCache = null)
     {
         // In a real implementation, you might track errors over a sliding window.
         // Here, we simply reuse the logic from BasicCircuitBreaker.

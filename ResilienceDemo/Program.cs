@@ -2,22 +2,16 @@
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Resilience;
 using Resilience.Configuration;
 using Resilience.LoadShedder;
 using Resilience.CircuitBreaker;
+using Resilience.Caching;
 
 public class Program
 {
     public static async Task Main(string[] args)
     {
-        RedisCache redisCache = new RedisCache(new RedisCacheOptions
-        {
-            Configuration = "localhost:6379",
-            InstanceName = "ResilienceDemo"
-        });
-
         // Example configuration JSON file path. In production, adjust the path as necessary.
         string configPath = "resilienceConfig.json";
 
@@ -27,6 +21,13 @@ public class Program
         // For demonstration, we use the Gateway configuration.
         var gatewayCBConfig = config.Gateways.CircuitBreaker;
         var gatewayLSConfig = config.Gateways.LoadShedder;
+
+        // For demonstration, we use the Microservices configuration.
+        // var microservicesCBConfig = config.Microservices.CircuitBreaker;
+        // var microservicesLSConfig = config.Microservices.LoadShedder;
+
+        // Initialize Redis cache for distributed resilience.
+        RedisResilienceDistributedCache redisCache = new RedisResilienceDistributedCache("localhost:6379", gatewayCBConfig.Options.FailureThreshold);
 
         // Create resilience components using factories.
         ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(gatewayCBConfig.Type, gatewayCBConfig.Options, redisCache);

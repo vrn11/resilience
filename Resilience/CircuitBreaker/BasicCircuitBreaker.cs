@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
+using Resilience.Caching;
 
 namespace Resilience.CircuitBreaker
 {
@@ -17,16 +18,16 @@ namespace Resilience.CircuitBreaker
         private readonly SemaphoreSlim _stateSemaphore = new SemaphoreSlim(1, 1);
 
         // Optional distributed store integration (e.g., Redis)
-        private readonly IDistributedCache? _distributedCache;
+        private readonly IResilienceDistributedCache? _resilienceCache;
 
         // Event for monitoring state changes
         public event Action<CircuitBreakerState>? OnStateChange;
 
-        public BasicCircuitBreaker(CircuitBreakerOptions options, IDistributedCache? distributedCache = null)
+        public BasicCircuitBreaker(CircuitBreakerOptions options, IResilienceDistributedCache? resilienceCache = null)
         {
             _failureThreshold = options.FailureThreshold;
             _openTimeout = options.OpenTimeout;
-            _distributedCache = distributedCache;
+            _resilienceCache = resilienceCache;
         }
 
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<Task<T>> fallback = default!)
@@ -77,9 +78,9 @@ namespace Resilience.CircuitBreaker
                 await SetStateAsync(CircuitBreakerState.Closed);
                 _failureCount = 0;
 
-                if (_distributedCache != null)
+                if (_resilienceCache != null)
                 {
-                    await _distributedCache.RemoveAsync("circuit-breaker-failures");
+                    await _resilienceCache.RemoveAsync("circuit-breaker-failures");
                 }
             }
             finally
@@ -95,17 +96,9 @@ namespace Resilience.CircuitBreaker
             {
                 _failureCount++;
 
-                if (_distributedCache != null)
+                if (_resilienceCache != null)
                 {
-                    var currentFailureCount = await _distributedCache.GetStringAsync("circuit-breaker-failures");
-                    int failureCount = string.IsNullOrEmpty(currentFailureCount) ? 0 : int.Parse(currentFailureCount);
-                    failureCount++;
-                    await _distributedCache.SetStringAsync("circuit-breaker-failures", failureCount.ToString());
-                }
-
-                if (_failureCount >= _failureThreshold)
-                {
-                    await SetStateAsync(CircuitBreakerState.Open);
+                    await _resilienceCache.IncrementFailuresAsync();
                 }
             }
             finally
@@ -116,9 +109,9 @@ namespace Resilience.CircuitBreaker
 
         private async Task<CircuitBreakerState> GetCurrentStateAsync()
         {
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                var stateValue = await _distributedCache.GetStringAsync("circuit-breaker-state");
+                var stateValue = await _resilienceCache.GetStringAsync("circuit-breaker-state");
                 if (Enum.TryParse<CircuitBreakerState>(stateValue, out var state))
                 {
                     _state = state;
@@ -152,10 +145,10 @@ namespace Resilience.CircuitBreaker
                 }
             }
 
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                await _distributedCache.SetStringAsync("circuit-breaker-state", _state.ToString());
-                await _distributedCache.SetStringAsync("circuit-breaker-last-changed", _lastStateChangedUtc.ToString("O"));
+                await _resilienceCache.SetStringAsync("circuit-breaker-state", _state.ToString());
+                await _resilienceCache.SetStringAsync("circuit-breaker-last-changed", _lastStateChangedUtc.ToString("O"));
             }
         }
     }
