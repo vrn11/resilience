@@ -76,9 +76,13 @@ Resilience/
    git clone https://github.com/vrn11/resilience.git
    cd resilience
 2. Build the solution:
-dotnet build resilience.sln
+```bash
+  dotnet build resilience.sln
+```
 3. Run the demo application:
-dotnet run --project ResilienceDemo/ResilienceDemo.csproj
+```bash
+  dotnet run --project ResilienceDemo/ResilienceDemo.csproj
+```
 
 ### Configuration
 The resilience strategies are configured using a JSON file (resilienceConfig.json). Below is an example configuration:
