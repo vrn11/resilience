@@ -25,16 +25,21 @@ public class RedisResilienceDistributedCache : IResilienceDistributedCache
     /// <param name="failureThreshold">The failure threshold for the circuit breaker.</param>
     /// <exception cref="ArgumentNullException">Thrown when redisConnectionString is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when failureThreshold is less than or equal to zero.</exception>
-    public RedisResilienceDistributedCache(string redisConnectionString, int failureThreshold)
+    public RedisResilienceDistributedCache(CachingOptions options)
     {
-        if (string.IsNullOrEmpty(redisConnectionString))
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrEmpty(options.ConnectionString))
         {
-            throw new ArgumentNullException(nameof(redisConnectionString));
+            throw new ArgumentNullException(nameof(options.ConnectionString));
         }
-        if (failureThreshold <= 0)
+        if (options.CircuitBreakerFailureThreshold <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(failureThreshold), "Failure threshold must be greater than zero.");
+            throw new ArgumentOutOfRangeException(nameof(options.CircuitBreakerFailureThreshold), "Failure threshold must be greater than zero.");
         }
+        
+        string redisConnectionString = options.ConnectionString;
+        int failureThreshold = options.CircuitBreakerFailureThreshold;
 
         _redisConnection = ConnectionMultiplexer.Connect(redisConnectionString);
         _redisDatabase = _redisConnection.GetDatabase();

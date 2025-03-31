@@ -21,13 +21,14 @@ public class Program
         // For demonstration, we use the Gateway configuration.
         var gatewayCBConfig = config.Gateways.CircuitBreaker;
         var gatewayLSConfig = config.Gateways.LoadShedder;
-
+        var gatewayCacheConfig = config.Gateways.Cache;
+        
         // For demonstration, we use the Microservices configuration.
         // var microservicesCBConfig = config.Microservices.CircuitBreaker;
         // var microservicesLSConfig = config.Microservices.LoadShedder;
 
         // Initialize Redis cache for distributed resilience.
-        RedisResilienceDistributedCache redisCache = new RedisResilienceDistributedCache("localhost:6379", gatewayCBConfig.Options.FailureThreshold);
+        RedisResilienceDistributedCache redisCache = new RedisResilienceDistributedCache(gatewayCacheConfig.Options);
 
         // Create resilience components using factories.
         ICircuitBreaker circuitBreaker = CircuitBreakerFactory.Create(gatewayCBConfig.Type, gatewayCBConfig.Options, redisCache);

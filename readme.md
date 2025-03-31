@@ -88,21 +88,29 @@ Resilience/
 The resilience strategies are configured using a JSON file (resilienceConfig.json). Below is an example configuration:
 ```bash
 {
-  "Gateways": {
-    "CircuitBreaker": {
-      "Type": "basic",
-      "Options": {
-        "FailureThreshold": 3,
-        "OpenTimeout": "00:00:05"
-      }
-    },
-    "LoadShedder": {
-      "Type": "static",
-      "Options": {
-        "LoadThreshold": 0.7
-      }
+    "Gateways": {
+        "CommonSettings": {
+            "FailureThreshold": 5
+        },
+        "CircuitBreaker": {
+            "Type": "latency",
+            "Options": {
+                "OpenTimeout": "00:00:01"
+            }
+        },
+        "LoadShedder": {
+            "Type": "static",
+            "Options": {
+                "LoadThreshold": 0.8
+            }
+        },
+        "Cache": {
+            "Type": "redis",
+            "Options": {
+                "ConnectionString": "localhost:6379"
+            }
+        }
     }
-  }
 }
 ```
 

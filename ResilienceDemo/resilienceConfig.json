@@ -1,9 +1,11 @@
 {
     "Gateways": {
+      "CommonSettings": {
+        "FailureThreshold": 5
+      },
       "CircuitBreaker": {
         "Type": "latency",
         "Options": {
-          "FailureThreshold": 5,
           "OpenTimeout": "00:00:01"
         }
       },
@@ -12,13 +14,21 @@
         "Options": {
           "LoadThreshold": 0.8
         }
+      },
+      "Cache": {
+        "Type": "redis",
+        "Options": {
+          "ConnectionString": "localhost:6379"
+        }
       }
     },
     "Microservices": {
+      "CommonSettings": {
+        "FailureThreshold": 3
+      },
       "CircuitBreaker": {
         "Type": "errorrate",
         "Options": {
-          "FailureThreshold": 3,
           "OpenTimeout": "00:00:05"
         }
       },
@@ -26,6 +36,12 @@
         "Type": "responsive",
         "Options": {
           "LoadThreshold": 0.6
+        }
+      },
+      "Cache": {
+        "Type": "redis",
+        "Options": {
+          "ConnectionString": "localhost:6379"
         }
       }
     }
