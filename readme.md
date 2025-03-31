@@ -161,6 +161,9 @@ Contributions are welcome! Please follow these steps:
 2. Create a feature branch.
 3. Submit a pull request.
 
+## License
+- This project is licensed under the MIT License. See the LICENSE file for details.
+
 ## Acknowledgments
 - Inspired by resilience patterns such as Circuit Breaker and Load Shedding.
 - Built with .NET 9.0.
