@@ -17,6 +17,11 @@ The **Resilience SDK** is a .NET-based library designed to provide robust and co
   - **Static Load Shedder**: Uses a fixed threshold to shed low-priority traffic.
   - **Responsive Load Shedder**: Dynamically adjusts thresholds based on historical metrics and current conditions.
 
+## Caching
+- Provides distributed state management for resilience components.
+  - Supports Redis for distributed caching.
+  - Customizable caching interface for other backends.
+
 ### Configuration-Driven Strategies
 - Resilience strategies can be fully customized through JSON-based configuration, allowing runtime adjustments without redeployments.
 
@@ -47,6 +52,9 @@ Resilience/
     ComponentConfiguration.cs 
     ResilienceConfigParser.cs 
     ResilienceConfiguration.cs 
+  Caching/
+    IResilienceDistributedCache.cs
+    RedisResilienceDistributedCache.cs
   LoadShedder/ 
     StaticLoadShedder.cs 
     ResponsiveLoadShedder.cs 
@@ -69,7 +77,7 @@ Resilience/
 2. Build the solution:
 dotnet build resilience.sln
 3. Run the demo application:
-dotnet run --project CircuitBreakerDemo/CircuitBreakerDemo.csproj
+dotnet run --project ResilienceDemo/ResilienceDemo.csproj
 
 ### Configuration
 The resilience strategies are configured using a JSON file (resilienceConfig.json). Below is an example configuration:
