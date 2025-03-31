@@ -30,9 +30,10 @@ The **Resilience SDK** is a .NET-based library designed to provide robust and co
 - **Thread-Safe Updates**: Supports safe updates to thresholds and metrics in both synchronous and asynchronous contexts.
 
 ### Extensibility
-- Add custom circuit breakers or load shedders by implementing the provided interfaces:
+- Add custom circuit breakers, load shedders or caching strategies by implementing the provided interfaces:
   - **ICircuitBreaker**
   - **ILoadShedder**
+  - **IResilienceDistributedCache**
 
 ---
 
@@ -145,9 +146,18 @@ Console.WriteLine(result);
 1. Implement the ILoadShedder interface.
 2. Add your implementation to the LoadShedderFactory.
 
+### Adding a custom caching strategy
+1. Implement the IResilienceDistributedCache interface.
+2. Use your implementation in the circuit breaker or load shedder.
+
 ### Contributing
 Contributions are welcome! Please follow these steps:
 
 1. Fork the repository.
 2. Create a feature branch.
 3. Submit a pull request.
+
+## Acknowledgments
+- Inspired by resilience patterns such as Circuit Breaker and Load Shedding.
+- Built with .NET 9.0.
+- Redis integration powered by StackExchange.Redis.
