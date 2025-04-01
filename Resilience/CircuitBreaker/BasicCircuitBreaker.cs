@@ -66,6 +66,13 @@ namespace Resilience.CircuitBreaker
             catch
             {
                 await IncrementFailureAsync(); // Increment failure count
+
+                // Execute fallback if provided
+                if (fallback != null)
+                {
+                    return await fallback();
+                }
+
                 throw;
             }
         }
@@ -95,6 +102,11 @@ namespace Resilience.CircuitBreaker
             try
             {
                 _failureCount++;
+
+                if (_failureCount >= _failureThreshold)
+                {
+                    await SetStateAsync(CircuitBreakerState.Open);
+                }
 
                 if (_resilienceCache != null)
                 {
