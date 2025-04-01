@@ -1,12 +1,11 @@
 ﻿namespace ResilienceTests;
 using Resilience.CircuitBreaker;
-using Resilience.Caching;
 using Resilience.Configuration;
-
+using Resilience.Caching;
 using Moq;
 using Xunit;
 
-public class BasicCircuitBreakerTests
+public class CircuitBreakerTests
 {
     [Fact]
     public async Task ExecuteAsync_ShouldReturnSuccess_WhenCircuitIsClosed()
@@ -21,7 +20,7 @@ public class BasicCircuitBreakerTests
         var circuitBreaker = new BasicCircuitBreaker(options, mockCache.Object);
 
         // Act
-        var result = await circuitBreaker.ExecuteAsync( () => Task.FromResult("Success"));
+        var result = await circuitBreaker.ExecuteAsync(() => Task.FromResult("Success"));
 
         // Assert
         Assert.Equal("Success", result);
@@ -49,6 +48,7 @@ public class BasicCircuitBreakerTests
         }
 
         var setStateTask = setStateMethod.Invoke(circuitBreaker, new object[] { CircuitBreakerState.Open });
+
         if (setStateTask == null)
         {
             throw new InvalidOperationException("Failed to invoke 'SetStateAsync'.");
@@ -94,7 +94,7 @@ public class BasicCircuitBreakerTests
         for (int i = 0; i < 3; i++)
         {
             var incrementFailureTask = incrementFailureMethod.Invoke(circuitBreaker, null);
-            
+
             if (incrementFailureTask == null)
             {
                 throw new InvalidOperationException("Failed to invoke 'IncrementFailureAsync'.");
@@ -104,7 +104,8 @@ public class BasicCircuitBreakerTests
         }
 
         var getStateTask = getStateMethod.Invoke(circuitBreaker, null);
-        if (getStateTask == null || getStateTask.GetType() != typeof(Task<CircuitBreakerState>))
+
+        if (getStateTask == null)
         {
             throw new InvalidOperationException("Failed to invoke 'GetCurrentStateAsync'.");
         }
