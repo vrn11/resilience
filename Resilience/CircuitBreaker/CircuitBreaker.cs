@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
+using Resilience.Caching;
 
 namespace Resilience.CircuitBreaker
 {
@@ -20,17 +22,35 @@ namespace Resilience.CircuitBreaker
         private int _state = (int)CircuitBreakerState.Closed;
         private DateTime _lastStateChangedUtc = DateTime.UtcNow;
 
+        private long _lastStateChangedUtcTicks = DateTime.UtcNow.Ticks;
+
+        private DateTime LastStateChangedUtc
+        {
+            get => new DateTime(Interlocked.Read(ref _lastStateChangedUtcTicks));
+            set => Interlocked.Exchange(ref _lastStateChangedUtcTicks, value.Ticks);
+        }
+
         // Optional distributed store for state sharing (e.g., Redis)
-        private readonly IDistributedCache? _distributedCache;
+        private readonly IResilienceDistributedCache? _resilienceCache;
 
         // Event for monitoring state changes
         public event Action<CircuitBreakerState>? OnStateChange;
 
-        public CircuitBreaker(CircuitBreakerOptions options, IDistributedCache? distributedCache = null)
+        public CircuitBreaker(CircuitBreakerOptions options, IResilienceDistributedCache? resilienceCache = null)
         {
+            if (options.FailureThreshold <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options.FailureThreshold), "FailureThreshold must be greater than zero.");
+            }
+
+            if (options.OpenTimeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options.OpenTimeout), "OpenTimeout must be greater than zero.");
+            }
+
             _failureThreshold = options.FailureThreshold;
             _openTimeout = options.OpenTimeout;
-            _distributedCache = distributedCache;
+            _resilienceCache = resilienceCache;
         }
 
         /// <summary>
@@ -42,6 +62,11 @@ namespace Resilience.CircuitBreaker
         /// <returns>The result of the action or fallback.</returns>
         public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<Task<T>> fallback = default!)
         {
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action), "Action cannot be null.");
+            }
+
             // Check circuit breaker state
             if (await GetCurrentStateAsync() == CircuitBreakerState.Open)
             {
@@ -81,9 +106,9 @@ namespace Resilience.CircuitBreaker
             Interlocked.Exchange(ref _failureCount, 0);
 
             // Clear distributed cache for failures
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                await _distributedCache.RemoveAsync("circuit-breaker-failures");
+                await _resilienceCache.RemoveAsync("circuit-breaker-failures");
             }
         }
 
@@ -94,12 +119,16 @@ namespace Resilience.CircuitBreaker
         {
             int currentFailureCount = Interlocked.Increment(ref _failureCount);
 
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                // Sync failure count in Redis
-                string failureCountStr = await _distributedCache.GetStringAsync("circuit-breaker-failures") ?? "0";
-                int distributedFailureCount = int.Parse(failureCountStr) + 1;
-                await _distributedCache.SetStringAsync("circuit-breaker-failures", distributedFailureCount.ToString());
+                try
+                {
+                    await _resilienceCache.IncrementFailuresAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error incrementing failure count in distributed cache: {ex.Message}");
+                }
             }
 
             if (currentFailureCount >= _failureThreshold)
@@ -115,7 +144,14 @@ namespace Resilience.CircuitBreaker
         {
             if (fallback != null)
             {
-                return await fallback();
+                try
+                {
+                    return await fallback();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in fallback: {ex.Message}");
+                }
             }
 
             throw new CircuitBreakerOpenException("Circuit breaker is open.");
@@ -126,32 +162,44 @@ namespace Resilience.CircuitBreaker
         /// </summary>
         private async Task<CircuitBreakerState> GetCurrentStateAsync()
         {
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                string? stateValue = await _distributedCache.GetStringAsync("circuit-breaker-state");
-                if (!string.IsNullOrEmpty(stateValue) &&
-                    Enum.TryParse<CircuitBreakerState>(stateValue, out var state))
+                var serializedState = await _resilienceCache.GetStringAsync("circuit-breaker-state");
+                if (!string.IsNullOrEmpty(serializedState))
                 {
-                    return state;
+                    try
+                    {
+                        var cacheState = JsonSerializer.Deserialize<CircuitBreakerCacheState>(serializedState);
+                        if (cacheState != null && Enum.TryParse<CircuitBreakerState>(cacheState.State, out var state))
+                        {
+                            _state = (int)state;
+                            LastStateChangedUtc = DateTime.Parse(cacheState.LastChangedUtc);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error deserializing circuit breaker state: {ex.Message}");
+                    }
                 }
             }
+
             return (CircuitBreakerState)_state;
         }
 
         /// <summary>
         /// Sets the circuit breaker state and notifies state change subscribers.
+        /// This method must always be called from within a lock or semaphore to ensure thread safety.
         /// </summary>
         private async Task SetStateAsync(CircuitBreakerState newState)
         {
             Interlocked.Exchange(ref _state, (int)newState);
-            _lastStateChangedUtc = DateTime.UtcNow;
+            LastStateChangedUtc = DateTime.UtcNow;
 
             // Notify monitoring systems asynchronously
             if (OnStateChange != null)
             {
-                foreach (var handler in OnStateChange.GetInvocationList())
-                {
-                    _ = Task.Run(() =>
+                var tasks = OnStateChange.GetInvocationList()
+                    .Select(handler => Task.Run(() =>
                     {
                         try
                         {
@@ -159,18 +207,31 @@ namespace Resilience.CircuitBreaker
                         }
                         catch (Exception ex)
                         {
-                            // Log the exception (optional)
                             Console.WriteLine($"Error in OnStateChange handler: {ex.Message}");
                         }
-                    });
-                }
+                    }));
+
+                await Task.WhenAll(tasks);
             }
 
             // Persist state to distributed storage
-            if (_distributedCache != null)
+            if (_resilienceCache != null)
             {
-                await _distributedCache.SetStringAsync("circuit-breaker-state", newState.ToString());
-                await _distributedCache.SetStringAsync("circuit-breaker-last-changed", _lastStateChangedUtc.ToString("O"));
+                try
+                {
+                    var cacheState = new CircuitBreakerCacheState
+                    {
+                        State = ((CircuitBreakerState)_state).ToString(),
+                        LastChangedUtc = LastStateChangedUtc.ToString("O")
+                    };
+
+                    var serializedState = JsonSerializer.Serialize(cacheState);
+                    await _resilienceCache.SetStringAsync("circuit-breaker-state", serializedState);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error updating distributed cache: {ex.Message}");
+                }
             }
         }
     }
