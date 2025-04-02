@@ -70,17 +70,23 @@ namespace Resilience.LoadShedder
         /// <summary>
         /// Gets the current load value, optionally synced with distributed storage.
         /// </summary>
+
         public double GetCurrentLoad()
         {
             if (_distributedCache != null)
             {
-                string? cachedLoad = _distributedCache.GetString("load-shedder-current-load");
-                if (!string.IsNullOrEmpty(cachedLoad) && double.TryParse(cachedLoad, out var distributedLoad))
+                var cachedValue = _distributedCache.Get("load-shedder-current-load");
+                if (cachedValue != null)
                 {
-                    return distributedLoad;
+                    var cachedString = System.Text.Encoding.UTF8.GetString(cachedValue);
+                    if (double.TryParse(cachedString, out var cachedLoad))
+                    {
+                        return cachedLoad;
+                    }
                 }
             }
 
+            // Fallback to load monitor
             return _loadMonitor();
         }
 

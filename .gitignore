@@ -4,3 +4,5 @@ Resilience/obj/
 Resilience/bin/
 ResilienceTests/obj/
 ResilienceTests/bin/
+ResilienceTests/TestResults/
+ResilienceTests/coverage-report/
