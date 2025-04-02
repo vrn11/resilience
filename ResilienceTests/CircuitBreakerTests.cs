@@ -17,7 +17,7 @@ public class CircuitBreakerTests
             OpenTimeout = TimeSpan.FromSeconds(5)
         };
         var mockCache = new Mock<IResilienceDistributedCache>();
-        var circuitBreaker = new BasicCircuitBreaker(options, mockCache.Object);
+        var circuitBreaker = new CircuitBreaker(options, mockCache.Object);
 
         // Act
         var result = await circuitBreaker.ExecuteAsync(() => Task.FromResult("Success"));
