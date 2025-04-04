@@ -50,6 +50,24 @@ namespace Resilience.LoadShedder
         }
 
         /// <summary>
+        /// Dynamically calculates the load threshold based on historical usage or real-time metrics.
+        /// </summary>
+        private async Task<double> GetDynamicThresholdAsync(CancellationToken cancellationToken = default)
+        {
+            if (_distributedCache != null)
+            {
+                // Retrieve a dynamically calculated threshold from distributed storage (e.g., historical trends)
+                string? cachedThreshold = await _distributedCache.GetStringAsync("responsive-load-threshold", cancellationToken);
+                if (!string.IsNullOrEmpty(cachedThreshold) && double.TryParse(cachedThreshold, out var dynamicThreshold))
+                {
+                    return dynamicThreshold;
+                }
+            }
+
+            return BaseLoadThreshold; // Fallback to base threshold if no distributed data is available
+        }
+
+        /// <summary>
         /// Updates the base load threshold asynchronously and synchronizes it globally if distributed cache is enabled.
         /// </summary>
         public async Task UpdateThresholdAsync(double newThreshold)
@@ -94,8 +112,8 @@ namespace Resilience.LoadShedder
         /// </summary>
         public async Task<T> ExecuteAsync<T>(RequestPriority priority, Func<Task<T>> action, Func<Task<T>> fallback = default!)
         {
-            double currentLoad = GetCurrentLoad();
-            double dynamicThreshold = GetDynamicThreshold();
+            double currentLoad = await GetCurrentLoadAsync();
+            double dynamicThreshold = await GetDynamicThresholdAsync();
 
             if (currentLoad > dynamicThreshold && ShouldShed(priority))
             {
@@ -114,14 +132,41 @@ namespace Resilience.LoadShedder
         {
             if (_distributedCache != null)
             {
-                string? cachedLoad = _distributedCache.GetString("responsive-current-load");
-                if (!string.IsNullOrEmpty(cachedLoad) && double.TryParse(cachedLoad, out var distributedLoad))
+                var cachedValue = _distributedCache.Get("responsive-current-load");
+                if (cachedValue != null)
                 {
-                    return distributedLoad;
+                    var cachedString = System.Text.Encoding.UTF8.GetString(cachedValue);
+                    if (double.TryParse(cachedString, out var cachedLoad))
+                    {
+                        return cachedLoad;
+                    }
                 }
             }
 
-            return _loadMonitor(); // Fallback to local load monitor
+            // Fallback to load monitor
+            return _loadMonitor();
+        }
+
+        /// <summary>
+        /// Retrieves the current system load from the monitor or distributed storage.
+        /// </summary>
+        public async Task<double> GetCurrentLoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (_distributedCache != null)
+            {
+                var cachedValue = await _distributedCache.GetAsync("responsive-current-load", cancellationToken);
+                if (cachedValue != null)
+                {
+                    var cachedString = System.Text.Encoding.UTF8.GetString(cachedValue);
+                    if (double.TryParse(cachedString, out var cachedLoad))
+                    {
+                        return cachedLoad;
+                    }
+                }
+            }
+
+            // Fallback to load monitor
+            return _loadMonitor();
         }
 
         /// <summary>
