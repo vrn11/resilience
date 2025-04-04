@@ -53,7 +53,7 @@ namespace Resilience.LoadShedder
         /// </summary>
         public async Task<T> ExecuteAsync<T>(RequestPriority priority, Func<Task<T>> action, Func<Task<T>> fallback = default!)
         {
-            double currentLoad = GetCurrentLoad();
+            double currentLoad = await GetCurrentLoadAsync();
 
             if (currentLoad > LoadThreshold && ShouldShed(priority))
             {
@@ -73,6 +73,20 @@ namespace Resilience.LoadShedder
             if (_distributedCache != null)
             {
                 string? cachedLoad = _distributedCache.GetString("static-load-shedder-current-load");
+                if (!string.IsNullOrEmpty(cachedLoad) && double.TryParse(cachedLoad, out var distributedLoad))
+                {
+                    return distributedLoad;
+                }
+            }
+
+            return _loadMonitor(); // Fallback to the provided load monitor
+        }
+
+        public async Task<double> GetCurrentLoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (_distributedCache != null)
+            {
+                string? cachedLoad = await _distributedCache.GetStringAsync("static-load-shedder-current-load", cancellationToken);
                 if (!string.IsNullOrEmpty(cachedLoad) && double.TryParse(cachedLoad, out var distributedLoad))
                 {
                     return distributedLoad;
