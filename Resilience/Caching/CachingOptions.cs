@@ -1,4 +1,4 @@
-﻿namespace Resilience;
+﻿namespace Resilience.Caching;
 
 public class CachingOptions
 {

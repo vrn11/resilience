@@ -46,6 +46,24 @@ public class RedisResilienceDistributedCache : IResilienceDistributedCache
         _failureThreshold = failureThreshold;
     }
 
+    public RedisResilienceDistributedCache(CachingOptions options, IConnectionMultiplexer connectionMultiplexer)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(connectionMultiplexer);
+
+        if (string.IsNullOrEmpty(options.ConnectionString))
+        {
+            throw new ArgumentNullException(nameof(options.ConnectionString));
+        }
+        if (options.CircuitBreakerFailureThreshold <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options.CircuitBreakerFailureThreshold), "Failure threshold must be greater than zero.");
+        }
+
+        _redisConnection = connectionMultiplexer;
+        _redisDatabase = _redisConnection.GetDatabase();
+        _failureThreshold = options.CircuitBreakerFailureThreshold;
+    }
     /// <summary>
     /// Gets the current value of a cache key.
     /// </summary>
@@ -110,10 +128,10 @@ public class RedisResilienceDistributedCache : IResilienceDistributedCache
             throw new ArgumentNullException(nameof(key));
         }
 
-        var value = await _redisDatabase.StringGetAsync(key);
+        var value = await _redisDatabase.StringGetAsync(key, CommandFlags.None);
         if (!value.IsNullOrEmpty)
         {
-            await _redisDatabase.StringSetAsync(key, value); // Reset the expiration
+            await _redisDatabase.StringSetAsync(key, value,null, When.Always, CommandFlags.None); // Reset the expiration
         }
     }
 
@@ -297,7 +315,7 @@ public class RedisResilienceDistributedCache : IResilienceDistributedCache
             throw new ArgumentNullException(nameof(key), "Key or value cannot be null.");
         }
 
-        await _redisDatabase.StringSetAsync(key, value);
+        await _redisDatabase.StringSetAsync(key, value, null, When.Always, CommandFlags.None);
     }
 
     public async Task RefreshAsync(string key, CancellationToken token = default)

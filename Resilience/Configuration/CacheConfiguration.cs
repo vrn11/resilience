@@ -1,4 +1,5 @@
 ﻿namespace Resilience.Configuration;
+using Resilience.Caching;
 
 public class CacheConfiguration
 {
